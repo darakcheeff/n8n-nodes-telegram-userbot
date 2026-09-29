@@ -30,6 +30,7 @@ class TelegramUserBotHealthCheck {
     async execute() {
         const startTime = Date.now();
         const steps = [];
+        let client;
         try {
             steps.push('Getting credentials...');
             const credentials = await this.getCredentials('telegramUserBotApi');
@@ -67,10 +68,11 @@ class TelegramUserBotHealthCheck {
             }
             steps.push('Creating client...');
             const stringSession = new sessions_1.StringSession(sessionString);
-            const client = new telegram_1.TelegramClient(stringSession, apiId, apiHash, {
+            client = new telegram_1.TelegramClient(stringSession, apiId, apiHash, {
                 connectionRetries: 2,
                 timeout: 10,
                 proxy,
+                autoReconnect: false,
             });
             steps.push('Connecting...');
             // Add timeout wrapper
@@ -84,7 +86,7 @@ class TelegramUserBotHealthCheck {
             const me = await client.getMe();
             steps.push(`Got user: ${me.firstName} (${me.id})`);
             steps.push('Disconnecting...');
-            await client.disconnect();
+            await client.destroy();
             steps.push('Disconnected');
             const totalTime = Date.now() - startTime;
             return [[{
@@ -103,6 +105,10 @@ class TelegramUserBotHealthCheck {
                     }]];
         }
         catch (error) {
+            try {
+                if (client) await client.destroy();
+            }
+            catch { }
             const totalTime = Date.now() - startTime;
             const errorMessage = error.message;
             steps.push(`ERROR: ${errorMessage}`);

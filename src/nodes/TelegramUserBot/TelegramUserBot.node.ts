@@ -249,9 +249,10 @@ export class TelegramUserBot implements INodeType {
 
     const stringSession = new StringSession(sessionString);
     const client = new TelegramClient(stringSession, apiId, apiHash, {
-      connectionRetries: 5,
+      connectionRetries: 3,
       proxy,
       timeout: 30,
+      autoReconnect: false,
     });
 
     try {
@@ -516,11 +517,11 @@ export class TelegramUserBot implements INodeType {
         }
       }
 
-      await client.disconnect();
+      await client.destroy();
       return [returnData];
     } catch (error) {
       try {
-        await client.disconnect();
+        await client.destroy();
       } catch {}
       throw new NodeOperationError(this.getNode(), error as Error);
     }

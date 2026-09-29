@@ -136,7 +136,7 @@ export class TelegramUserBotTrigger implements INodeType {
     async function closeFunction() {
       try {
         client.removeEventHandler(handler, new NewMessage({}));
-        await client.disconnect();
+        await client.destroy();
       } catch {}
     }
 

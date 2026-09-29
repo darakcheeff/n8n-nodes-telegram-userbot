@@ -195,7 +195,11 @@ class TelegramUserBotTrigger {
         client.addEventHandler(eventHandler, new events_1.NewMessage({}));
         // Return manual trigger response
         const closeFunction = async () => {
-            await client.disconnect();
+            try {
+                client.removeEventHandler(eventHandler, new events_1.NewMessage({}));
+                await client.destroy();
+            }
+            catch { }
         };
         return {
             closeFunction,

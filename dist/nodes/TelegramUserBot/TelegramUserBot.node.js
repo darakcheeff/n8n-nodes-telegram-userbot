@@ -235,9 +235,10 @@ class TelegramUserBot {
         }
         const stringSession = new sessions_1.StringSession(sessionString);
         const client = new telegram_1.TelegramClient(stringSession, apiId, apiHash, {
-            connectionRetries: 5,
+            connectionRetries: 3,
             proxy,
             timeout: 30,
+            autoReconnect: false,
         });
         try {
             await client.connect();
@@ -500,12 +501,12 @@ class TelegramUserBot {
                     throw error;
                 }
             }
-            await client.disconnect();
+            await client.destroy();
             return [returnData];
         }
         catch (error) {
             try {
-                await client.disconnect();
+                await client.destroy();
             }
             catch { }
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), error);

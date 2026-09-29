@@ -46,12 +46,13 @@ export class TelegramUserBotHealthCheck implements INodeType {
       connectionRetries: 3,
       proxy,
       timeout: 15,
+      autoReconnect: false,
     });
 
     try {
       await client.connect();
       const me: any = await client.getMe();
-      await client.disconnect();
+      await client.destroy();
 
       return [
         [
@@ -69,7 +70,7 @@ export class TelegramUserBotHealthCheck implements INodeType {
       ];
     } catch (error) {
       try {
-        await client.disconnect();
+        await client.destroy();
       } catch {}
       throw new NodeOperationError(this.getNode(), error as Error);
     }
