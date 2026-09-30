@@ -16,7 +16,7 @@ class TelegramUserBot {
             icon: 'file:telegram.svg',
             group: ['output'],
             version: 1,
-            subtitle: '={{["operation"]}}',
+            subtitle: '={{$parameter["operation"]}}',
             description: 'Send messages, export history with pagination, and manage dialogs via Telegram User Bot (MTProto)',
             defaults: {
                 name: 'Telegram User Bot',
@@ -78,9 +78,16 @@ class TelegramUserBot {
                             description: 'Get information about the logged-in account',
                             action: 'Get self info',
                         },
+                        {
+                            name: 'Check Chatlist / Addlist',
+                            value: 'checkChatlist',
+                            description: 'Get channels and groups inside a Telegram addlist / chatlist invite link',
+                            action: 'Check chatlist / addlist',
+                        },
                     ],
                     default: 'sendMessage',
                 },
+                // Chat ID parameter
                 {
                     displayName: 'Chat ID',
                     name: 'chatId',
@@ -92,8 +99,9 @@ class TelegramUserBot {
                         },
                     },
                     default: '',
-                    description: 'The Telegram chat ID',
+                    description: 'The Telegram chat ID (e.g. -1001234567890 or @username)',
                 },
+                // Send Message fields
                 {
                     displayName: 'Message',
                     name: 'message',
@@ -110,6 +118,7 @@ class TelegramUserBot {
                         rows: 4,
                     },
                 },
+                // Get Messages & Dialogs Limit
                 {
                     displayName: 'Limit',
                     name: 'limit',
@@ -122,6 +131,7 @@ class TelegramUserBot {
                     default: 100,
                     description: 'Maximum number of items to return (1-100 recommended per page)',
                 },
+                // Pagination parameter: Offset ID
                 {
                     displayName: 'Offset Message ID',
                     name: 'offsetId',
@@ -134,6 +144,7 @@ class TelegramUserBot {
                     default: 0,
                     description: 'Only return messages older than this message ID (for pagination)',
                 },
+                // Pagination parameter: Offset Date
                 {
                     displayName: 'Offset Date (Unix Timestamp)',
                     name: 'offsetDate',
@@ -146,6 +157,7 @@ class TelegramUserBot {
                     default: 0,
                     description: 'Only return messages older than this Unix timestamp (seconds)',
                 },
+                // Stop condition: Min Date
                 {
                     displayName: 'Stop at Date (Unix Timestamp)',
                     name: 'minDate',
@@ -158,6 +170,7 @@ class TelegramUserBot {
                     default: 0,
                     description: 'Stop retrieving messages older than this Unix timestamp (seconds)',
                 },
+                // Only Unread
                 {
                     displayName: 'Only Unread',
                     name: 'onlyUnread',
@@ -170,6 +183,7 @@ class TelegramUserBot {
                     default: false,
                     description: 'Whether to only return unread messages',
                 },
+                // Import Contact fields
                 {
                     displayName: 'Phone Number',
                     name: 'phoneNumber',
@@ -209,10 +223,25 @@ class TelegramUserBot {
                     default: '',
                     description: 'Last name for the contact (optional)',
                 },
+                // Addlist Slug / URL parameter
+                {
+                    displayName: 'Slug or URL',
+                    name: 'slug',
+                    type: 'string',
+                    required: true,
+                    displayOptions: {
+                        show: {
+                            operation: ['checkChatlist'],
+                        },
+                    },
+                    default: '',
+                    description: 'The addlist slug (e.g. IFpH9zDbQDljZTBi) or full link (https://t.me/addlist/IFpH9zDbQDljZTBi)',
+                },
             ],
         };
     }
     async execute() {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         const items = this.getInputData();
         const returnData = [];
         const credentials = await this.getCredentials('telegramUserBotApi');
@@ -226,19 +255,16 @@ class TelegramUserBot {
                 ip: credentials.proxyHost || '127.0.0.1',
                 port: parseInt(credentials.proxyPort, 10) || 1080,
             };
-            if (credentials.proxyUsername) {
+            if (credentials.proxyUsername)
                 proxy.username = credentials.proxyUsername;
-            }
-            if (credentials.proxyPassword) {
+            if (credentials.proxyPassword)
                 proxy.password = credentials.proxyPassword;
-            }
         }
         const stringSession = new sessions_1.StringSession(sessionString);
         const client = new telegram_1.TelegramClient(stringSession, apiId, apiHash, {
-            connectionRetries: 3,
+            connectionRetries: 5,
             proxy,
             timeout: 30,
-            autoReconnect: false,
         });
         try {
             await client.connect();
@@ -289,9 +315,7 @@ class TelegramUserBot {
                         const offsetId = this.getNodeParameter('offsetId', i, 0);
                         const offsetDate = this.getNodeParameter('offsetDate', i, 0);
                         const minDate = this.getNodeParameter('minDate', i, 0);
-
                         const entity = await client.getEntity(chatId);
-
                         const getParams = { limit };
                         if (offsetId > 0) {
                             getParams.offsetId = offsetId;
@@ -299,18 +323,16 @@ class TelegramUserBot {
                         if (offsetDate > 0) {
                             getParams.offsetDate = offsetDate;
                         }
-
                         const messages = await client.getMessages(entity, getParams);
-
                         let unreadCount = 0;
                         if (onlyUnread) {
                             try {
                                 const dialogs = await client.getDialogs({ limit: 100 });
-                                const dialog = dialogs.find(d => d.id?.toString() === chatId);
-                                unreadCount = dialog?.unreadCount || 0;
-                            } catch {}
+                                const dialog = dialogs.find((d) => { var _a; return ((_a = d.id) === null || _a === void 0 ? void 0 : _a.toString()) === chatId; });
+                                unreadCount = (dialog === null || dialog === void 0 ? void 0 : dialog.unreadCount) || 0;
+                            }
+                            catch { }
                         }
-
                         const messageList = [];
                         for (let j = 0; j < messages.length; j++) {
                             const msg = messages[j];
@@ -318,19 +340,18 @@ class TelegramUserBot {
                                 break;
                             if (minDate > 0 && msg.date && msg.date < minDate)
                                 break;
-
-                            let senderInfo = { id: msg.senderId?.toString() || '0' };
+                            // Fast synchronous sender resolution from embedded entities (0 extra network calls)
+                            let senderInfo = { id: ((_a = msg.senderId) === null || _a === void 0 ? void 0 : _a.toString()) || '0' };
                             if (msg.sender) {
                                 const s = msg.sender;
                                 senderInfo = {
-                                    id: s.id?.toString() || msg.senderId?.toString() || '0',
+                                    id: ((_b = s.id) === null || _b === void 0 ? void 0 : _b.toString()) || ((_c = msg.senderId) === null || _c === void 0 ? void 0 : _c.toString()) || '0',
                                     firstName: s.firstName || null,
                                     lastName: s.lastName || null,
                                     username: s.username || null,
                                     phone: s.phone || null,
                                 };
                             }
-
                             messageList.push({
                                 messageId: msg.id,
                                 text: msg.text || msg.message || '',
@@ -338,8 +359,8 @@ class TelegramUserBot {
                                 isOutgoing: Boolean(msg.out),
                                 sender: senderInfo,
                                 hasMedia: msg.media !== undefined,
-                                mediaType: msg.media?.className || null,
-                                replyToMsgId: msg.replyTo?.replyToMsgId || null,
+                                mediaType: ((_d = msg.media) === null || _d === void 0 ? void 0 : _d.className) || null,
+                                replyToMsgId: ((_e = msg.replyTo) === null || _e === void 0 ? void 0 : _e.replyToMsgId) || null,
                             });
                         }
                         returnData.push({
@@ -359,17 +380,17 @@ class TelegramUserBot {
                         for (const dialog of dialogs) {
                             if (dialog.unreadCount > 0) {
                                 const messages = await client.getMessages(dialog.entity, {
-                                    limit: Math.min(dialog.unreadCount, limit)
+                                    limit: Math.min(dialog.unreadCount, limit),
                                 });
                                 const messageList = [];
                                 for (const msg of messages) {
                                     if (msg.out)
                                         continue;
-                                    let senderInfo = { id: msg.senderId?.toString() };
+                                    let senderInfo = { id: (_f = msg.senderId) === null || _f === void 0 ? void 0 : _f.toString() };
                                     if (msg.sender) {
                                         const s = msg.sender;
                                         senderInfo = {
-                                            id: s.id?.toString() || msg.senderId?.toString(),
+                                            id: ((_g = s.id) === null || _g === void 0 ? void 0 : _g.toString()) || ((_h = msg.senderId) === null || _h === void 0 ? void 0 : _h.toString()),
                                             firstName: s.firstName || null,
                                             lastName: s.lastName || null,
                                             username: s.username || null,
@@ -386,7 +407,7 @@ class TelegramUserBot {
                                 }
                                 if (messageList.length > 0) {
                                     unreadChats.push({
-                                        chatId: dialog.id?.toString(),
+                                        chatId: (_j = dialog.id) === null || _j === void 0 ? void 0 : _j.toString(),
                                         chatName: dialog.name || dialog.title,
                                         isUser: dialog.isUser,
                                         isGroup: dialog.isGroup,
@@ -428,7 +449,7 @@ class TelegramUserBot {
                     else if (operation === 'importContact') {
                         const phoneNumber = this.getNodeParameter('phoneNumber', i);
                         const firstName = this.getNodeParameter('firstName', i);
-                        const lastName = this.getNodeParameter('lastName', i);
+                        const lastName = this.getNodeParameter('lastName', i, '');
                         const contact = new telegram_1.Api.InputPhoneContact({
                             clientId: (0, big_integer_1.default)(Date.now()),
                             phone: phoneNumber.replace(/\s+/g, ''),
@@ -463,14 +484,19 @@ class TelegramUserBot {
                     else if (operation === 'getDialogs') {
                         const limit = this.getNodeParameter('limit', i, 100);
                         const dialogs = await client.getDialogs({ limit });
-                        const dialogList = dialogs.map((d) => ({
-                            id: d.id?.toString(),
-                            name: d.name || d.title,
-                            isUser: d.isUser,
-                            isGroup: d.isGroup,
-                            isChannel: d.isChannel,
-                            unreadCount: d.unreadCount,
-                        }));
+                        const dialogList = dialogs.map((d) => {
+                            var _a, _b, _c;
+                            return ({
+                                id: (_a = d.id) === null || _a === void 0 ? void 0 : _a.toString(),
+                                name: d.name || d.title,
+                                isUser: d.isUser,
+                                isGroup: d.isGroup,
+                                isChannel: d.isChannel,
+                                unreadCount: d.unreadCount,
+                                topMessage: ((_b = d.message) === null || _b === void 0 ? void 0 : _b.id) || d.topMessage || null,
+                                date: ((_c = d.message) === null || _c === void 0 ? void 0 : _c.date) || d.date || null,
+                            });
+                        });
                         returnData.push({
                             json: {
                                 success: true,
@@ -492,6 +518,61 @@ class TelegramUserBot {
                             },
                         });
                     }
+                    else if (operation === 'checkChatlist') {
+                        const rawSlug = this.getNodeParameter('slug', i);
+                        const cleanSlug = rawSlug.replace(/^.*\/addlist\//, '').replace(/[^a-zA-Z0-9_-]/g, '');
+                        try {
+                            const inviteRes = await client.invoke(new telegram_1.Api.chatlists.CheckChatlistInvite({
+                                slug: cleanSlug,
+                            }));
+                            const folderTitle = inviteRes.title || null;
+                            const chats = Array.isArray(inviteRes.chats) ? inviteRes.chats : [];
+                            const extractedChannels = [];
+                            for (const c of chats) {
+                                const rawId = ((_k = c.id) === null || _k === void 0 ? void 0 : _k.toString()) || '';
+                                let channelId = rawId;
+                                if (c.broadcast || c.megagroup) {
+                                    channelId = rawId.startsWith('-100') ? rawId : (rawId.startsWith('-') ? rawId : `-100${rawId}`);
+                                }
+                                const channelType = c.broadcast ? 'channel' : (c.megagroup ? 'supergroup' : 'group');
+                                const username = c.username || null;
+                                const inviteLink = username ? `https://t.me/${username}` : `https://t.me/addlist/${cleanSlug}`;
+                                extractedChannels.push({
+                                    slug: cleanSlug,
+                                    folder_title: folderTitle,
+                                    channel_id: channelId,
+                                    title: c.title || 'Untitled',
+                                    username: username,
+                                    channel_type: channelType,
+                                    participants_count: c.participantsCount || null,
+                                    invite_link: inviteLink,
+                                    is_verified: Boolean(c.verified),
+                                    is_scam: Boolean(c.scam),
+                                    is_fake: Boolean(c.fake),
+                                });
+                            }
+                            returnData.push({
+                                json: {
+                                    success: true,
+                                    slug: cleanSlug,
+                                    folder_title: folderTitle,
+                                    chats_count: extractedChannels.length,
+                                    channels: extractedChannels,
+                                },
+                            });
+                        }
+                        catch (err) {
+                            const errMsg = (err === null || err === void 0 ? void 0 : err.message) || String(err);
+                            returnData.push({
+                                json: {
+                                    success: false,
+                                    slug: cleanSlug,
+                                    error: errMsg,
+                                    is_expired: errMsg.includes('INVITE_SLUG_EXPIRED') || errMsg.includes('INVITE_SLUG_INVALID'),
+                                },
+                            });
+                        }
+                    }
                 }
                 catch (error) {
                     if (this.continueOnFail()) {
@@ -501,12 +582,12 @@ class TelegramUserBot {
                     throw error;
                 }
             }
-            await client.destroy();
+            await client.disconnect();
             return [returnData];
         }
         catch (error) {
             try {
-                await client.destroy();
+                await client.disconnect();
             }
             catch { }
             throw new n8n_workflow_1.NodeOperationError(this.getNode(), error);
