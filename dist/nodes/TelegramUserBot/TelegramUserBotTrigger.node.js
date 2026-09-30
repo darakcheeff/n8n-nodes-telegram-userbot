@@ -30,26 +30,10 @@ class TelegramUserBotTrigger {
                     name: 'filter',
                     type: 'options',
                     options: [
-                        {
-                            name: 'All Messages',
-                            value: 'all',
-                            description: 'Trigger on all incoming messages',
-                        },
-                        {
-                            name: 'Private Messages Only',
-                            value: 'private',
-                            description: 'Trigger only on private (direct) messages',
-                        },
-                        {
-                            name: 'Group Messages Only',
-                            value: 'group',
-                            description: 'Trigger only on group messages',
-                        },
-                        {
-                            name: 'Specific Chat',
-                            value: 'specific',
-                            description: 'Trigger only on messages from a specific chat',
-                        },
+                        { name: 'All Messages', value: 'all', description: 'Trigger on all incoming messages' },
+                        { name: 'Private Messages Only', value: 'private', description: 'Trigger only on private messages' },
+                        { name: 'Group Messages Only', value: 'group', description: 'Trigger only on group messages' },
+                        { name: 'Specific Chat', value: 'specific', description: 'Trigger only on messages from a specific chat' },
                     ],
                     default: 'private',
                     description: 'Filter which messages to trigger on',
@@ -83,7 +67,6 @@ class TelegramUserBotTrigger {
         const sessionString = credentials.sessionString;
         const filter = this.getNodeParameter('filter');
         const includeOutgoing = this.getNodeParameter('includeOutgoing');
-        // Build proxy config if enabled
         let proxy;
         if (credentials.useProxy) {
             proxy = {
@@ -91,12 +74,10 @@ class TelegramUserBotTrigger {
                 ip: credentials.proxyHost || '127.0.0.1',
                 port: parseInt(credentials.proxyPort, 10) || 1080,
             };
-            if (credentials.proxyUsername) {
+            if (credentials.proxyUsername)
                 proxy.username = credentials.proxyUsername;
-            }
-            if (credentials.proxyPassword) {
+            if (credentials.proxyPassword)
                 proxy.password = credentials.proxyPassword;
-            }
         }
         const stringSession = new sessions_1.StringSession(sessionString);
         const client = new telegram_1.TelegramClient(stringSession, apiId, apiHash, {
@@ -105,106 +86,62 @@ class TelegramUserBotTrigger {
             timeout: 30,
         });
         await client.connect();
-        const eventHandler = async (event) => {
-            const message = event.message;
-            // Skip outgoing messages if not included
-            if (!includeOutgoing && message.out) {
+        const handler = async (event) => {
+            var _a, _b, _c, _d, _e, _f, _g;
+            const msg = event.message;
+            if (!includeOutgoing && msg.out)
                 return;
-            }
-            // Apply filters
-            if (filter === 'private') {
-                if (!event.isPrivate)
+            const isPrivate = msg.isPrivate;
+            const isGroup = msg.isGroup || msg.isChannel;
+            if (filter === 'private' && !isPrivate)
+                return;
+            if (filter === 'group' && !isGroup)
+                return;
+            if (filter === 'specific') {
+                const targetChatId = this.getNodeParameter('chatId');
+                if (((_a = msg.chatId) === null || _a === void 0 ? void 0 : _a.toString()) !== targetChatId)
                     return;
             }
-            else if (filter === 'group') {
-                if (!event.isGroup && !event.isChannel)
-                    return;
+            let senderInfo = { id: (_b = msg.senderId) === null || _b === void 0 ? void 0 : _b.toString() };
+            if (msg.sender) {
+                const s = msg.sender;
+                senderInfo = {
+                    id: ((_c = s.id) === null || _c === void 0 ? void 0 : _c.toString()) || ((_d = msg.senderId) === null || _d === void 0 ? void 0 : _d.toString()),
+                    firstName: s.firstName || null,
+                    lastName: s.lastName || null,
+                    username: s.username || null,
+                    phone: s.phone || null,
+                };
             }
-            else if (filter === 'specific') {
-                const chatId = this.getNodeParameter('chatId');
-                const messageChatId = message.chatId?.toString();
-                if (messageChatId !== chatId)
-                    return;
-            }
-            // Get sender information
-            let senderInfo = { id: '' };
-            try {
-                const sender = await message.getSender();
-                if (sender instanceof telegram_1.Api.User) {
-                    senderInfo = {
-                        id: sender.id.toString(),
-                        firstName: sender.firstName || undefined,
-                        lastName: sender.lastName || undefined,
-                        username: sender.username || undefined,
-                        phone: sender.phone || undefined,
-                    };
-                }
-            }
-            catch {
-                senderInfo = { id: message.senderId?.toString() || 'unknown' };
-            }
-            // Get chat information
-            let chatInfo = { id: '', type: 'unknown' };
-            try {
-                const chat = await message.getChat();
-                if (chat instanceof telegram_1.Api.User) {
-                    chatInfo = {
-                        id: chat.id.toString(),
-                        type: 'private',
-                        title: [chat.firstName, chat.lastName].filter(Boolean).join(' ') || undefined,
-                    };
-                }
-                else if (chat instanceof telegram_1.Api.Chat) {
-                    chatInfo = {
-                        id: chat.id.toString(),
-                        type: 'group',
-                        title: chat.title,
-                    };
-                }
-                else if (chat instanceof telegram_1.Api.Channel) {
-                    chatInfo = {
-                        id: chat.id.toString(),
-                        type: chat.megagroup ? 'supergroup' : 'channel',
-                        title: chat.title,
-                    };
-                }
-            }
-            catch {
-                chatInfo = { id: message.chatId?.toString() || 'unknown', type: 'unknown' };
-            }
-            // Build output data
-            const outputData = {
-                messageId: message.id,
-                text: message.text || '',
-                date: message.date,
-                chatId: message.chatId?.toString(),
-                senderId: message.senderId?.toString(),
-                isOutgoing: message.out,
-                isPrivate: event.isPrivate,
-                isGroup: event.isGroup,
-                isChannel: event.isChannel,
-                sender: senderInfo,
-                chat: chatInfo,
-                replyToMessageId: message.replyTo?.replyToMsgId,
-                hasMedia: message.media !== undefined,
-                mediaType: message.media?.className || null,
-            };
-            this.emit([this.helpers.returnJsonArray([outputData])]);
+            this.emit([
+                [
+                    {
+                        json: {
+                            messageId: msg.id,
+                            chatId: (_e = msg.chatId) === null || _e === void 0 ? void 0 : _e.toString(),
+                            text: msg.text || msg.message || '',
+                            date: msg.date,
+                            isOutgoing: Boolean(msg.out),
+                            sender: senderInfo,
+                            hasMedia: msg.media !== undefined,
+                            mediaType: ((_f = msg.media) === null || _f === void 0 ? void 0 : _f.className) || null,
+                            replyToMsgId: ((_g = msg.replyTo) === null || _g === void 0 ? void 0 : _g.replyToMsgId) || null,
+                        },
+                    },
+                ],
+            ]);
         };
-        // Add event handler for new messages
-        client.addEventHandler(eventHandler, new events_1.NewMessage({}));
-        // Return manual trigger response
-        const closeFunction = async () => {
+        client.addEventHandler(handler, new events_1.NewMessage({}));
+        async function closeFunction() {
             try {
-                client.removeEventHandler(eventHandler, new events_1.NewMessage({}));
-                await client.destroy();
+                client.removeEventHandler(handler, new events_1.NewMessage({}));
+                await client.disconnect();
             }
             catch { }
-        };
+        }
         return {
             closeFunction,
         };
     }
 }
 exports.TelegramUserBotTrigger = TelegramUserBotTrigger;
-//# sourceMappingURL=TelegramUserBotTrigger.node.js.map
