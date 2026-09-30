@@ -78,6 +78,12 @@ export class TelegramUserBot implements INodeType {
             description: 'Get information about the logged-in account',
             action: 'Get self info',
           },
+          {
+            name: 'Check Chatlist / Addlist',
+            value: 'checkChatlist',
+            description: 'Get channels and groups inside a Telegram addlist / chatlist invite link',
+            action: 'Check chatlist / addlist',
+          },
         ],
         default: 'sendMessage',
       },
@@ -225,6 +231,20 @@ export class TelegramUserBot implements INodeType {
         default: '',
         description: 'Last name for the contact (optional)',
       },
+      // Addlist Slug / URL parameter
+      {
+        displayName: 'Slug or URL',
+        name: 'slug',
+        type: 'string',
+        required: true,
+        displayOptions: {
+          show: {
+            operation: ['checkChatlist'],
+          },
+        },
+        default: '',
+        description: 'The addlist slug (e.g. IFpH9zDbQDljZTBi) or full link (https://t.me/addlist/IFpH9zDbQDljZTBi)',
+      },
     ],
   };
 
@@ -249,10 +269,9 @@ export class TelegramUserBot implements INodeType {
 
     const stringSession = new StringSession(sessionString);
     const client = new TelegramClient(stringSession, apiId, apiHash, {
-      connectionRetries: 3,
+      connectionRetries: 5,
       proxy,
       timeout: 30,
-      autoReconnect: false,
     });
 
     try {
@@ -486,6 +505,8 @@ export class TelegramUserBot implements INodeType {
               isGroup: d.isGroup,
               isChannel: d.isChannel,
               unreadCount: d.unreadCount,
+              topMessage: d.message?.id || d.topMessage || null,
+              date: d.message?.date || d.date || null,
             }));
 
             returnData.push({
@@ -507,6 +528,67 @@ export class TelegramUserBot implements INodeType {
                 phone: me.phone,
               },
             });
+          } else if (operation === 'checkChatlist') {
+            const rawSlug = this.getNodeParameter('slug', i) as string;
+            const cleanSlug = rawSlug.replace(/^.*\/addlist\//, '').replace(/[^a-zA-Z0-9_-]/g, '');
+
+            try {
+              const inviteRes: any = await client.invoke(
+                new Api.chatlists.CheckChatlistInvite({
+                  slug: cleanSlug,
+                })
+              );
+
+              const folderTitle = inviteRes.title || null;
+              const chats = Array.isArray(inviteRes.chats) ? inviteRes.chats : [];
+              const extractedChannels: any[] = [];
+
+              for (const c of chats) {
+                const rawId = c.id?.toString() || '';
+                let channelId = rawId;
+                if (c.broadcast || c.megagroup) {
+                  channelId = rawId.startsWith('-100') ? rawId : (rawId.startsWith('-') ? rawId : `-100${rawId}`);
+                }
+
+                const channelType = c.broadcast ? 'channel' : (c.megagroup ? 'supergroup' : 'group');
+                const username = c.username || null;
+                const inviteLink = username ? `https://t.me/${username}` : `https://t.me/addlist/${cleanSlug}`;
+
+                extractedChannels.push({
+                  slug: cleanSlug,
+                  folder_title: folderTitle,
+                  channel_id: channelId,
+                  title: c.title || 'Untitled',
+                  username: username,
+                  channel_type: channelType,
+                  participants_count: c.participantsCount || null,
+                  invite_link: inviteLink,
+                  is_verified: Boolean(c.verified),
+                  is_scam: Boolean(c.scam),
+                  is_fake: Boolean(c.fake),
+                });
+              }
+
+              returnData.push({
+                json: {
+                  success: true,
+                  slug: cleanSlug,
+                  folder_title: folderTitle,
+                  chats_count: extractedChannels.length,
+                  channels: extractedChannels,
+                },
+              });
+            } catch (err: any) {
+              const errMsg = err?.message || String(err);
+              returnData.push({
+                json: {
+                  success: false,
+                  slug: cleanSlug,
+                  error: errMsg,
+                  is_expired: errMsg.includes('INVITE_SLUG_EXPIRED') || errMsg.includes('INVITE_SLUG_INVALID'),
+                },
+              });
+            }
           }
         } catch (error) {
           if (this.continueOnFail()) {
@@ -517,11 +599,11 @@ export class TelegramUserBot implements INodeType {
         }
       }
 
-      await client.destroy();
+      await client.disconnect();
       return [returnData];
     } catch (error) {
       try {
-        await client.destroy();
+        await client.disconnect();
       } catch {}
       throw new NodeOperationError(this.getNode(), error as Error);
     }
