@@ -5,4 +5,3 @@ export declare class TelegramUserBotApi implements ICredentialType {
     documentationUrl: string;
     properties: INodeProperties[];
 }
-//# sourceMappingURL=TelegramUserBotApi.credentials.d.ts.map
