@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-telegram-userbot",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Enhanced n8n community node for Telegram User Bot (MTProto) with pagination and fast message fetching",
   "keywords": [
     "n8n-community-node-package",
@@ -50,12 +50,12 @@
     "n8n-workflow": "^1.0.0",
     "prettier": "^3.1.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.3"
   },
   "dependencies": {
-    "telegram": "^2.22.2",
+    "big-integer": "^1.6.52",
     "input": "^1.0.1",
-    "big-integer": "^1.6.52"
+    "telegram": "^2.22.2"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
