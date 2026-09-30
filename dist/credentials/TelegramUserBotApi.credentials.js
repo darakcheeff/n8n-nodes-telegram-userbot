@@ -42,7 +42,7 @@ class TelegramUserBotApi {
                 name: 'useProxy',
                 type: 'boolean',
                 default: false,
-                description: 'Whether to use a SOCKS5 proxy (required in Iran)',
+                description: 'Whether to use a SOCKS5 proxy',
             },
             {
                 displayName: 'Proxy Host',
@@ -79,4 +79,3 @@ class TelegramUserBotApi {
     }
 }
 exports.TelegramUserBotApi = TelegramUserBotApi;
-//# sourceMappingURL=TelegramUserBotApi.credentials.js.map
