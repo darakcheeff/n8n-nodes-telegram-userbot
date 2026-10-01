@@ -272,6 +272,7 @@ export class TelegramUserBot implements INodeType {
       connectionRetries: 5,
       proxy,
       timeout: 30,
+      autoReconnect: false,
     });
 
     try {
@@ -599,13 +600,13 @@ export class TelegramUserBot implements INodeType {
         }
       }
 
-      await client.disconnect();
       return [returnData];
     } catch (error) {
-      try {
-        await client.disconnect();
-      } catch {}
       throw new NodeOperationError(this.getNode(), error as Error);
+    } finally {
+      try {
+        await client.destroy();
+      } catch {}
     }
   }
 }

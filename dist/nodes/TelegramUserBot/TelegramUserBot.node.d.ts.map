@@ -1,0 +1,1 @@
+{"version":3,"file":"TelegramUserBot.node.d.ts","sourceRoot":"","sources":["../../../src/nodes/TelegramUserBot/TelegramUserBot.node.ts"],"names":[],"mappings":"AAAA,OAAO,EACL,iBAAiB,EACjB,kBAAkB,EAClB,SAAS,EACT,oBAAoB,EAErB,MAAM,cAAc,CAAC;AAKtB,qBAAa,eAAgB,YAAW,SAAS;IAC/C,WAAW,EAAE,oBAAoB,CA4O/B;IAEI,OAAO,CAAC,IAAI,EAAE,iBAAiB,GAAG,OAAO,CAAC,kBAAkB,EAAE,EAAE,CAAC,CAwWtE;CACF"}

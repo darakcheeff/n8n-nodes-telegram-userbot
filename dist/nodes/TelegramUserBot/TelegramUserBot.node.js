@@ -265,6 +265,7 @@ class TelegramUserBot {
             connectionRetries: 5,
             proxy,
             timeout: 30,
+            autoReconnect: false,
         });
         try {
             await client.connect();
@@ -484,19 +485,16 @@ class TelegramUserBot {
                     else if (operation === 'getDialogs') {
                         const limit = this.getNodeParameter('limit', i, 100);
                         const dialogs = await client.getDialogs({ limit });
-                        const dialogList = dialogs.map((d) => {
-                            var _a, _b, _c;
-                            return ({
-                                id: (_a = d.id) === null || _a === void 0 ? void 0 : _a.toString(),
-                                name: d.name || d.title,
-                                isUser: d.isUser,
-                                isGroup: d.isGroup,
-                                isChannel: d.isChannel,
-                                unreadCount: d.unreadCount,
-                                topMessage: ((_b = d.message) === null || _b === void 0 ? void 0 : _b.id) || d.topMessage || null,
-                                date: ((_c = d.message) === null || _c === void 0 ? void 0 : _c.date) || d.date || null,
-                            });
-                        });
+                        const dialogList = dialogs.map((d) => { var _a, _b, _c; return ({
+                            id: (_a = d.id) === null || _a === void 0 ? void 0 : _a.toString(),
+                            name: d.name || d.title,
+                            isUser: d.isUser,
+                            isGroup: d.isGroup,
+                            isChannel: d.isChannel,
+                            unreadCount: d.unreadCount,
+                            topMessage: ((_b = d.message) === null || _b === void 0 ? void 0 : _b.id) || d.topMessage || null,
+                            date: ((_c = d.message) === null || _c === void 0 ? void 0 : _c.date) || d.date || null,
+                        }); });
                         returnData.push({
                             json: {
                                 success: true,
@@ -582,16 +580,18 @@ class TelegramUserBot {
                     throw error;
                 }
             }
-            await client.disconnect();
             return [returnData];
         }
         catch (error) {
+            throw new n8n_workflow_1.NodeOperationError(this.getNode(), error);
+        }
+        finally {
             try {
-                await client.disconnect();
+                await client.destroy();
             }
             catch { }
-            throw new n8n_workflow_1.NodeOperationError(this.getNode(), error);
         }
     }
 }
 exports.TelegramUserBot = TelegramUserBot;
+//# sourceMappingURL=TelegramUserBot.node.js.map

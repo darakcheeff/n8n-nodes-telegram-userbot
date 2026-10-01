@@ -79,3 +79,4 @@ class TelegramUserBotApi {
     }
 }
 exports.TelegramUserBotApi = TelegramUserBotApi;
+//# sourceMappingURL=TelegramUserBotApi.credentials.js.map

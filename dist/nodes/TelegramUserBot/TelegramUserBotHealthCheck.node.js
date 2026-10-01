@@ -50,11 +50,11 @@ class TelegramUserBotHealthCheck {
             connectionRetries: 3,
             proxy,
             timeout: 15,
+            autoReconnect: false,
         });
         try {
             await client.connect();
             const me = await client.getMe();
-            await client.disconnect();
             return [
                 [
                     {
@@ -71,12 +71,15 @@ class TelegramUserBotHealthCheck {
             ];
         }
         catch (error) {
+            throw new n8n_workflow_1.NodeOperationError(this.getNode(), error);
+        }
+        finally {
             try {
-                await client.disconnect();
+                await client.destroy();
             }
             catch { }
-            throw new n8n_workflow_1.NodeOperationError(this.getNode(), error);
         }
     }
 }
 exports.TelegramUserBotHealthCheck = TelegramUserBotHealthCheck;
+//# sourceMappingURL=TelegramUserBotHealthCheck.node.js.map

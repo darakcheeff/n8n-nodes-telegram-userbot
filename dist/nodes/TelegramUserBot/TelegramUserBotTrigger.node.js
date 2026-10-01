@@ -84,6 +84,7 @@ class TelegramUserBotTrigger {
             connectionRetries: 5,
             proxy,
             timeout: 30,
+            autoReconnect: false,
         });
         await client.connect();
         const handler = async (event) => {
@@ -135,7 +136,7 @@ class TelegramUserBotTrigger {
         async function closeFunction() {
             try {
                 client.removeEventHandler(handler, new events_1.NewMessage({}));
-                await client.disconnect();
+                await client.destroy();
             }
             catch { }
         }
@@ -145,3 +146,4 @@ class TelegramUserBotTrigger {
     }
 }
 exports.TelegramUserBotTrigger = TelegramUserBotTrigger;
+//# sourceMappingURL=TelegramUserBotTrigger.node.js.map

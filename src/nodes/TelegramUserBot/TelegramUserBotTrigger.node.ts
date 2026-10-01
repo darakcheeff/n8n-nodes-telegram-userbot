@@ -82,6 +82,7 @@ export class TelegramUserBotTrigger implements INodeType {
       connectionRetries: 5,
       proxy,
       timeout: 30,
+      autoReconnect: false,
     });
 
     await client.connect();
@@ -136,7 +137,7 @@ export class TelegramUserBotTrigger implements INodeType {
     async function closeFunction() {
       try {
         client.removeEventHandler(handler, new NewMessage({}));
-        await client.disconnect();
+        await client.destroy();
       } catch {}
     }
 
